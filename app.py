@@ -66,6 +66,13 @@ class StudentSchema(ma.Schema):
     class Meta:
         fields = ("id", "first_name", "last_name", "year", "gpa")
 
+class StudentNameSchema(ma.Schema):
+    first_name = fields.String(required=True)
+    last_name = fields.String(required=True)
+
+    class Meta:
+        fields = ("first_name", "last_name")
+
 class InstructorSchema(ma.Schema):
     id = fields.Integer(primary_key=True)
     first_name = fields.String(required=True)
@@ -73,22 +80,25 @@ class InstructorSchema(ma.Schema):
     hire_date = fields.Date()
     class Meta:
         fields = ("id", "first_name", "last_name", "hire_date")
+
 class CourseSchema(ma.Schema):
     id = fields.Integer(primary_key=True)
     name = fields.String(required=True)
     credits = fields.Integer()
     instructor = ma.Nested(InstructorSchema, many=False)
-    students = ma.Nested(StudentSchema, many=True)
+    students = ma.Nested(StudentNameSchema, many=True)
     class Meta:
         fields = ("id", "name", "credits", "instructor", "students")
 
 students_schema = StudentSchema(many=True)
+stuedents_name_schema = StudentNameSchema(many=True)
 
 # Resources
 class StudentListResoucre(Resource):
     def get(self):
         sort_param = request.args.get('order')
-        #sort_param = "last_name" if sort_param != "gpa" else sort_param
+        print(sort_param)
+        #sort_param = "last_name" if sort_param != "gpa" else sort_param  - if this is uncommented, it defaults to sorting by last_name
 
         query = Student.query
         if sort_param:
@@ -99,6 +109,20 @@ class StudentListResoucre(Resource):
 
         students = query.all()
         return students_schema.dump(students)
+    
+class FullCourseDetailResource(Resource):
+    def get(self, course_id):
+        course = Course.query.get_or_404(course_id)
+
+        custom_response = {}
+        custom_response["name"] = course.name
+        custom_response["instructor_name"] = course.instructor.first_name + " " + course.instructor.last_name
+        student_info_dictionary = {}
+        student_info_dictionary["number_of_students"] = len(course.students)
+        student_info_dictionary["students"] = stuedents_name_schema.dump(course.students)
+        custom_response["student_info"] = student_info_dictionary
+
+        return custom_response, 200
 
 
 class InstructorListResource(Resource):
@@ -107,7 +131,12 @@ class InstructorListResource(Resource):
 class CourseListResource(Resource):
     pass
 
+class CourseResource(Resource):
+    def get(self, course_id):
+        pass
+
 # Routes
 api.add_resource(StudentListResoucre, "/api/students")
+api.add_resource(FullCourseDetailResource, "/api/course_details/<int:course_id>")
 
 
